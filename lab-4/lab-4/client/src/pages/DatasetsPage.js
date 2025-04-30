@@ -4,6 +4,10 @@ import { useAuth } from '../contexts/AuthContext';
 
 const DatasetsPage = () => {
   const { user, isAdmin, isDispatcher, isForeman, addUserToRequest } = useAuth();
+
+  console.log("isDispatcher", isDispatcher);
+  console.log("isAdmin", isAdmin);
+  console.log("isForeman", isForeman);  
   
   const [datasetList, setDatasetList] = useState([]);
   const [selectedDataset, setSelectedDataset] = useState('');
@@ -14,6 +18,8 @@ const DatasetsPage = () => {
   const [showEditModal, setShowEditModal] = useState(false);
   const [editName, setEditName] = useState('');
   const [selectedWorkshop, setSelectedWorkshop] = useState('');
+  const [showCalculateModal, setShowCalculateModal] = useState(false);
+  const [calculationResults, setCalculationResults] = useState(null);
   
   // Загрузка списка датасетов
   useEffect(() => {
@@ -116,6 +122,176 @@ const DatasetsPage = () => {
     openAddWindow();
   };
   
+  // Обработчик нажатия на кнопку Рассчитать
+  const handleCalculate = () => {
+    if (datasetData.length === 0) {
+      setError('Нет данных для расчета');
+      return;
+    }
+    
+    const results = calculateOptimization(datasetData);
+    setCalculationResults(results);
+    setShowCalculateModal(true);
+  };
+  
+  // Функция для генерации случайного числа в заданном диапазоне
+  const rand1 = (rfrom, rto) => {
+    const d = Math.random();
+    const value = rfrom + d * (rto - rfrom);
+    const i = Math.round(value * 10);
+    return i / 10;
+  };
+  
+  // Функция для нахождения максимального значения в массиве
+  const maxX = (val, size) => {
+    if (size > 0) {
+      return Math.max(...val.slice(0, size));
+    }
+    return 0;
+  };
+  
+  // Функция для нахождения минимального значения в массиве
+  const minX = (val, size) => {
+    if (size > 0) {
+      return Math.min(...val.slice(0, size));
+    }
+    return 0;
+  };
+  
+  // Функция для расчета оптимизации
+  const calculateOptimization = (data) => {
+    // Константы
+    const MMAX = 10;
+    const NMAX = 10;
+    const TMAX = 1;
+    
+    // Извлекаем размерности из данных
+    const m = data.length; // количество строк
+    const n = data[0].length; // количество столбцов
+    
+    if (m > MMAX || n > NMAX) {
+      setError('Слишком большие размерности данных');
+      return null;
+    }
+    
+    // Создаем массивы для расчетов
+    const A = Array(TMAX).fill().map(() => 
+      Array(MMAX).fill().map(() => 
+        Array(NMAX).fill(0)
+      )
+    );
+    const C = Array(NMAX).fill(0);
+    const DN = Array(NMAX).fill(0);
+    const DV = Array(NMAX).fill(0);
+    const DEL = Array(NMAX).fill(0);
+    const BN = Array(MMAX).fill(0);
+    const BV = Array(MMAX).fill(0);
+    const Y = Array(MMAX).fill(0);
+    const X = Array(NMAX).fill(0);
+    const AX = Array(MMAX).fill(0);
+    
+    // Заполняем матрицу A данными из датасета
+    for (let i = 0; i < m; i++) {
+      for (let j = 0; j < n; j++) {
+        // Преобразуем значение в число, если оно не число
+        const value = Number(data[i][j]);
+        A[0][i][j] = isNaN(value) ? 0 : value;
+      }
+    }
+    
+    // Инициализируем план X (просто заполняем числами от 1 до n)
+    for (let j = 0; j < n; j++) {
+      X[j] = j + 1;
+    }
+    
+    // Вычисляем AX
+    for (let i = 0; i < m; i++) {
+      AX[i] = 0;
+      for (let j = 0; j < n; j++) {
+        AX[i] += A[0][i][j] * X[j];
+      }
+    }
+    
+    // Вычисляем DN, DV, DEL
+    for (let j = 0; j < n; j++) {
+      const minXVal = minX(X.slice(0, n), n);
+      const maxXVal = maxX(X.slice(0, n), n);
+      const threshold1 = minXVal + 0.35 * (maxXVal - minXVal);
+      const threshold2 = minXVal + 0.65 * (maxXVal - minXVal);
+      
+      if (X[j] < threshold1) {
+        DN[j] = X[j];
+        DV[j] = maxXVal;
+        DEL[j] = rand1(
+          DN[j] + 0.25 * (DV[j] - DN[j]),
+          DN[j] + 0.45 * (DV[j] - DN[j])
+        );
+      } else if (X[j] <= threshold2) {
+        DN[j] = minXVal;
+        DV[j] = maxXVal;
+        DEL[j] = (maxXVal - minXVal) / 2;
+      } else {
+        DN[j] = minXVal;
+        DV[j] = X[j];
+        DEL[j] = rand1(
+          DN[j] + 0.55 * (DV[j] - DN[j]),
+          DN[j] + 0.75 * (DV[j] - DN[j])
+        );
+      }
+    }
+    
+    // Вычисляем BN, BV, Y
+    for (let i = 0; i < m; i++) {
+      const minAXVal = minX(AX.slice(0, m), m);
+      const maxAXVal = maxX(AX.slice(0, m), m);
+      const threshold1 = minAXVal + 0.35 * (maxAXVal - minAXVal);
+      const threshold2 = minAXVal + 0.65 * (maxAXVal - minAXVal);
+      
+      if (AX[i] < threshold1) {
+        BN[i] = AX[i];
+        BV[i] = maxAXVal;
+        Y[i] = rand1(
+          BN[i] + 0.25 * (BV[i] - BN[i]),
+          BN[i] + 0.45 * (BV[i] - BN[i])
+        );
+      } else if (AX[i] <= threshold2) {
+        BN[i] = minAXVal;
+        BV[i] = maxAXVal;
+        Y[i] = (maxAXVal - minAXVal) / 2;
+      } else {
+        BN[i] = minAXVal;
+        BV[i] = AX[i];
+        Y[i] = rand1(
+          BN[i] + 0.55 * (BV[i] - BN[i]),
+          BN[i] + 0.75 * (BV[i] - BN[i])
+        );
+      }
+    }
+    
+    // Вычисляем C и CX
+    let CX = 0;
+    for (let j = 0; j < n; j++) {
+      C[j] = DEL[j];
+      for (let i = 0; i < m; i++) {
+        C[j] += A[0][i][j] * Y[i];
+      }
+      CX += C[j] * X[j];
+    }
+    
+    // Формируем результаты
+    return {
+      C,
+      CX,
+      DN,
+      DV,
+      BN,
+      BV,
+      A: A[0],
+      X,
+      AX
+    };
+  };
+  
   // Открытие окна добавления
   const openAddWindow = () => {
     const rows = prompt('Введите количество строк:', '10');
@@ -126,9 +302,14 @@ const DatasetsPage = () => {
     }
   };
   
-  // Закрыть модальное окно
+  // Закрыть модальное окно редактирования
   const closeEditModal = () => {
     setShowEditModal(false);
+  };
+  
+  // Закрыть модальное окно расчетов
+  const closeCalculateModal = () => {
+    setShowCalculateModal(false);
   };
   
   // Сохранить изменения датасета
@@ -264,7 +445,7 @@ const DatasetsPage = () => {
               <tr key={rowIndex}>
                 {row.map((cell, colIndex) => (
                   <td key={colIndex} className="px-6 py-4 whitespace-nowrap">
-                    {isForeman ? (
+                    {isDispatcher() ? (
                       <span>{cell}</span>
                     ) : (
                       <input
@@ -309,7 +490,7 @@ const DatasetsPage = () => {
         <button
           className="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
           disabled={!isAdmin}
-          onClick={() => alert('Функция расчета (GenerateGUI)')}
+          onClick={handleCalculate}
         >
           Рассчитать
         </button>
@@ -364,6 +545,71 @@ const DatasetsPage = () => {
                 className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
               >
                 Сохранить изменения
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Модальное окно результатов расчетов */}
+      {showCalculateModal && calculationResults && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-8 max-w-4xl w-full max-h-screen overflow-y-auto">
+            <h2 className="text-xl font-semibold mb-4">Результаты расчетов</h2>
+            
+            <div className="space-y-6">
+              <div>
+                <div className="bg-gray-100 p-3 rounded">
+                  <p><span className="font-semibold">CX:</span> {calculationResults.CX.toFixed(2)}</p>
+                  <p><span className="font-semibold">C:</span> {calculationResults.C.map(val => val.toFixed(2)).join(', ')}</p>
+                </div>
+              </div>
+              
+              <div>
+                <div className="bg-gray-100 p-3 rounded">
+                  <p><span className="font-semibold">DN:</span> {calculationResults.DN.map(val => val.toFixed(2)).join(', ')}</p>
+                  <p><span className="font-semibold">DV:</span> {calculationResults.DV.map(val => val.toFixed(2)).join(', ')}</p>
+                </div>
+              </div>
+              
+              <div>
+                <div className="bg-gray-100 p-3 rounded">
+                  <p><span className="font-semibold">BN:</span> {calculationResults.BN.map(val => val.toFixed(2)).join(', ')}</p>
+                  <p><span className="font-semibold">BV:</span> {calculationResults.BV.map(val => val.toFixed(2)).join(', ')}</p>
+                </div>
+              </div>
+              
+              <div>
+                <div className="bg-gray-100 p-3 rounded">
+                  <p><span className="font-semibold">X:</span> {calculationResults.X.map(val => val.toFixed(2)).join(', ')}</p>
+                  <p><span className="font-semibold">AX:</span> {calculationResults.AX.map(val => val.toFixed(2)).join(', ')}</p>
+                </div>
+              </div>
+              
+              <div>
+                <h3 className="text-lg font-medium mb-2">A:</h3>
+                <div className="bg-gray-100 p-3 rounded overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {calculationResults.A.map((row, rowIndex) => (
+                        <tr key={rowIndex}>
+                          {row.slice(0, calculationResults.X.length).map((cell, colIndex) => (
+                            <td key={colIndex} className="px-3 py-2 text-center">{cell.toFixed(2)}</td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+            
+            <div className="mt-6 flex justify-end">
+              <button
+                onClick={closeCalculateModal}
+                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              >
+                Закрыть
               </button>
             </div>
           </div>

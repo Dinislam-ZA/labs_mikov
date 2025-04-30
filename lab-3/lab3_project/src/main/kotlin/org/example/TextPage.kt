@@ -16,7 +16,7 @@ object TextPage {
                 <li>паспорт;</li>
             </ul>
             <p>Сайт университета: <a href="https://bmstu.ru">bmstu.ru</a></p>
-            <p> Работа выполнена студентом группы ИУ6-42М <mark>Залимхановым Д.А. </mark></p>
+            <p> Работа выполнена студентом группы ИУ6-42М <strong>Залимхановым Д.А. </strong></p>
         </body>
         </html>
     """.trimIndent()

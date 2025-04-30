@@ -1,0 +1,11 @@
+Прод	Шифр_п	Шифр_ц	Шифр_пц	Орган_н_п	Орган_в_п	План_пц	Приб_пц	
+D1	d	d	n	m	p	71	34	
+D2	p	m	c	j	f	16	2	
+D3	o	t	c	y	m	55	76	
+D4	r	r	o	d	x	7	25	
+D5	f	s	n	f	d	48	62	
+D6	o	j	i	c	t	61	36	
+D7	r	n	s	q	j	47	26	
+D8	s	h	f	c	a	15	53	
+D9	m	a	n	b	c	63	91	
+D10	e	b	z	v	v	89	14	

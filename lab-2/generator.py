@@ -1,14 +1,18 @@
-import tkinter as tk
-from tkinter import ttk, messagebox, scrolledtext
+import sys
+from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, 
+                            QLineEdit, QPushButton, QFrame, QProgressBar, QTextEdit, QGroupBox, 
+                            QGridLayout, QDialog, QDialogButtonBox, QMessageBox, QSpinBox)
 import numpy as np
 import random
 import os
 
-class OptimizationGenerator:
-    def __init__(self, root):
-        self.root = root
-        self.root.title("Генератор задач оптимизации")
-        self.root.geometry("800x600")
+os.environ["QT_QPA_PLATFORM_PLUGIN_PATH"] = "C:/Users/denik/AppData/Local/Programs/Python/Python310/Lib/site-packages/PyQt5/Qt5/plugins/platforms"
+
+class OptimizationGenerator(QMainWindow):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("Генератор задач оптимизации")
+        self.resize(800, 600)
         
         # Константы
         self.MMAX = 10
@@ -17,8 +21,8 @@ class OptimizationGenerator:
         self.IMAX = 50
         
         # Переменные для хранения данных
-        self.Inter = tk.IntVar(value=1)  # Число временных интервалов
-        self.Iter = tk.IntVar(value=1)   # Число решаемых задач
+        self.Inter = 1  # Число временных интервалов
+        self.Iter = 1   # Число решаемых задач
         
         # Массивы для данных
         self.M = np.zeros(self.IMAX, dtype=int)
@@ -36,57 +40,84 @@ class OptimizationGenerator:
         self.DB = np.zeros(self.MMAX, dtype=float)
         self.CX = 0.0
         
+        # Создание центрального виджета
+        self.central_widget = QWidget()
+        self.setCentralWidget(self.central_widget)
+        self.main_layout = QVBoxLayout(self.central_widget)
+        
         # Создание основного интерфейса
         self.create_widgets()
         
-        # Текстовое поле для вывода информации
-        self.log_area = scrolledtext.ScrolledText(self.root, width=70, height=15)
-        self.log_area.grid(row=4, column=0, columnspan=2, padx=10, pady=10, sticky="nsew")
-        
-        # Настройка растяжения элементов
-        self.root.grid_rowconfigure(4, weight=1)
-        self.root.grid_columnconfigure(0, weight=1)
-        self.root.grid_columnconfigure(1, weight=1)
-        
     def create_widgets(self):
         # Фрейм для ввода параметров
-        param_frame = ttk.LabelFrame(self.root, text="Параметры генерации")
-        param_frame.grid(row=0, column=0, columnspan=2, padx=10, pady=10, sticky="nsew")
+        param_group = QGroupBox("Параметры генерации")
+        param_layout = QGridLayout()
+        param_group.setLayout(param_layout)
         
         # Ввод числа временных интервалов
-        ttk.Label(param_frame, text="Число временных интервалов:").grid(row=0, column=0, padx=5, pady=5, sticky="w")
-        ttk.Entry(param_frame, textvariable=self.Inter, width=10).grid(row=0, column=1, padx=5, pady=5)
+        param_layout.addWidget(QLabel("Число временных интервалов:"), 0, 0)
+        self.inter_spin = QSpinBox()
+        self.inter_spin.setMinimum(1)
+        self.inter_spin.setValue(self.Inter)
+        self.inter_spin.valueChanged.connect(self.update_inter)
+        param_layout.addWidget(self.inter_spin, 0, 1)
         
         # Ввод числа решаемых задач
-        ttk.Label(param_frame, text="Число решаемых задач:").grid(row=1, column=0, padx=5, pady=5, sticky="w")
-        ttk.Entry(param_frame, textvariable=self.Iter, width=10).grid(row=1, column=1, padx=5, pady=5)
+        param_layout.addWidget(QLabel("Число решаемых задач:"), 1, 0)
+        self.iter_spin = QSpinBox()
+        self.iter_spin.setMinimum(1)
+        self.iter_spin.setValue(self.Iter)
+        self.iter_spin.valueChanged.connect(self.update_iter)
+        param_layout.addWidget(self.iter_spin, 1, 1)
+        
+        self.main_layout.addWidget(param_group)
         
         # Кнопка запуска генерации
-        ttk.Button(self.root, text="Начать генерацию", command=self.start_generation).grid(
-            row=1, column=0, columnspan=2, padx=10, pady=10)
+        self.gen_button = QPushButton("Начать генерацию")
+        self.gen_button.clicked.connect(self.start_generation)
+        self.main_layout.addWidget(self.gen_button)
         
         # Фрейм для прогресса
-        progress_frame = ttk.LabelFrame(self.root, text="Прогресс")
-        progress_frame.grid(row=2, column=0, columnspan=2, padx=10, pady=5, sticky="nsew")
+        progress_group = QGroupBox("Прогресс")
+        progress_layout = QVBoxLayout()
+        progress_group.setLayout(progress_layout)
         
         # Индикатор прогресса
-        self.progress = ttk.Progressbar(progress_frame, orient="horizontal", length=300, mode="determinate")
-        self.progress.grid(row=0, column=0, padx=10, pady=10, sticky="ew")
-        progress_frame.grid_columnconfigure(0, weight=1)
+        self.progress = QProgressBar()
+        progress_layout.addWidget(self.progress)
+        
+        self.main_layout.addWidget(progress_group)
         
         # Кнопка очистки лога
-        ttk.Button(self.root, text="Очистить лог", command=self.clear_log).grid(
-            row=3, column=0, columnspan=2, padx=10, pady=5)
+        self.clear_button = QPushButton("Очистить лог")
+        self.clear_button.clicked.connect(self.clear_log)
+        self.main_layout.addWidget(self.clear_button)
+        
+        # Текстовое поле для вывода информации
+        self.log_area = QTextEdit()
+        self.log_area.setReadOnly(True)
+        self.main_layout.addWidget(self.log_area)
+    
+    def update_inter(self, value):
+        """Обновляет значение числа временных интервалов"""
+        self.Inter = value
+    
+    def update_iter(self, value):
+        """Обновляет значение числа решаемых задач"""
+        self.Iter = value
     
     def log_message(self, message):
         """Добавляет сообщение в лог с прокруткой в конец"""
-        self.log_area.insert(tk.END, message + "\n")
-        self.log_area.see(tk.END)
-        self.root.update_idletasks()  # Обновляем UI
+        self.log_area.append(message)
+        # Прокрутка в конец
+        cursor = self.log_area.textCursor()
+        cursor.movePosition(cursor.End)
+        self.log_area.setTextCursor(cursor)
+        QApplication.processEvents()  # Обновляем UI
     
     def clear_log(self):
         """Очищает текстовое поле лога"""
-        self.log_area.delete(1.0, tk.END)
+        self.log_area.clear()
     
     def rand1(self, rfrom, rto):
         """Аналог функции Rand1 из Pascal-программы"""
@@ -109,117 +140,116 @@ class OptimizationGenerator:
     
     def input_dialog(self, title, message):
         """Создает диалоговое окно для ввода значения"""
-        dialog = tk.Toplevel(self.root)
-        dialog.title(title)
-        dialog.geometry("300x150")
-        dialog.transient(self.root)
-        dialog.grab_set()
+        dialog = QDialog(self)
+        dialog.setWindowTitle(title)
+        dialog.resize(300, 150)
         
-        ttk.Label(dialog, text=message).pack(padx=10, pady=10)
+        layout = QVBoxLayout(dialog)
+        layout.addWidget(QLabel(message))
         
-        entry_var = tk.DoubleVar()
-        entry = ttk.Entry(dialog, textvariable=entry_var)
-        entry.pack(padx=10, pady=5)
-        entry.focus_set()
+        line_edit = QLineEdit()
+        layout.addWidget(line_edit)
         
-        result = [None]  # Используем список для передачи результата
+        button_box = QDialogButtonBox(QDialogButtonBox.Ok)
+        button_box.accepted.connect(dialog.accept)
+        layout.addWidget(button_box)
         
-        def on_ok():
-            result[0] = entry_var.get()
-            dialog.destroy()
+        result = None
+        if dialog.exec_() == QDialog.Accepted:
+            try:
+                result = float(line_edit.text())
+            except ValueError:
+                QMessageBox.warning(self, "Ошибка", "Введено некорректное значение")
+                return self.input_dialog(title, message)
         
-        ttk.Button(dialog, text="OK", command=on_ok).pack(padx=10, pady=10)
-        
-        # Ждем, пока окно закроется
-        self.root.wait_window(dialog)
-        return result[0]
+        return result
     
     def matrix_input_dialog(self, title, rows, cols):
         """Создает диалоговое окно для ввода матрицы"""
-        dialog = tk.Toplevel(self.root)
-        dialog.title(title)
-        dialog.transient(self.root)
-        dialog.grab_set()
+        dialog = QDialog(self)
+        dialog.setWindowTitle(title)
+        dialog.resize(max(300, cols * 100), max(200, rows * 50))
         
-        # Создаем фрейм для ввода значений матрицы
-        frame = ttk.Frame(dialog)
-        frame.pack(padx=10, pady=10, fill=tk.BOTH, expand=True)
+        layout = QVBoxLayout(dialog)
         
-        # Создаем поля ввода для каждого элемента матрицы
+        grid = QGridLayout()
         entries = []
+        
         for i in range(rows):
             row_entries = []
             for j in range(cols):
-                var = tk.DoubleVar()
-                ttk.Label(frame, text=f"A[{i+1},{j+1}]:").grid(row=i, column=j*2, padx=5, pady=2)
-                entry = ttk.Entry(frame, textvariable=var, width=8)
-                entry.grid(row=i, column=j*2+1, padx=5, pady=2)
-                row_entries.append(var)
+                grid.addWidget(QLabel(f"A[{i+1},{j+1}]:"), i, j*2)
+                entry = QLineEdit()
+                entry.setFixedWidth(80)
+                grid.addWidget(entry, i, j*2+1)
+                row_entries.append(entry)
             entries.append(row_entries)
         
-        result = [None]  # Используем список для передачи результата
+        layout.addLayout(grid)
         
-        def on_ok():
+        button_box = QDialogButtonBox(QDialogButtonBox.Ok)
+        button_box.accepted.connect(dialog.accept)
+        layout.addWidget(button_box)
+        
+        if dialog.exec_() == QDialog.Accepted:
             # Преобразуем введенные значения в матрицу
             matrix = np.zeros((rows, cols))
-            for i in range(rows):
-                for j in range(cols):
-                    matrix[i, j] = entries[i][j].get()
-            result[0] = matrix
-            dialog.destroy()
+            try:
+                for i in range(rows):
+                    for j in range(cols):
+                        matrix[i, j] = float(entries[i][j].text())
+                return matrix
+            except ValueError:
+                QMessageBox.warning(self, "Ошибка", "Введено некорректное значение")
+                return self.matrix_input_dialog(title, rows, cols)
         
-        ttk.Button(dialog, text="OK", command=on_ok).pack(padx=10, pady=10)
-        
-        # Ждем, пока окно закроется
-        self.root.wait_window(dialog)
-        return result[0]
+        return None
     
     def vector_input_dialog(self, title, message, size):
         """Создает диалоговое окно для ввода вектора"""
-        dialog = tk.Toplevel(self.root)
-        dialog.title(title)
-        dialog.transient(self.root)
-        dialog.grab_set()
+        dialog = QDialog(self)
+        dialog.setWindowTitle(title)
+        dialog.resize(300, max(200, size * 40))
         
-        ttk.Label(dialog, text=message).pack(padx=10, pady=10)
+        layout = QVBoxLayout(dialog)
+        layout.addWidget(QLabel(message))
         
-        # Создаем фрейм для ввода значений вектора
-        frame = ttk.Frame(dialog)
-        frame.pack(padx=10, pady=10, fill=tk.BOTH, expand=True)
-        
-        # Создаем поля ввода для каждого элемента вектора
+        grid = QGridLayout()
         entries = []
+        
         for i in range(size):
-            var = tk.DoubleVar()
-            ttk.Label(frame, text=f"X[{i+1}]:").grid(row=i, column=0, padx=5, pady=2)
-            entry = ttk.Entry(frame, textvariable=var, width=10)
-            entry.grid(row=i, column=1, padx=5, pady=2)
-            entries.append(var)
+            grid.addWidget(QLabel(f"X[{i+1}]:"), i, 0)
+            entry = QLineEdit()
+            grid.addWidget(entry, i, 1)
+            entries.append(entry)
         
-        result = [None]  # Используем список для передачи результата
+        layout.addLayout(grid)
         
-        def on_ok():
+        button_box = QDialogButtonBox(QDialogButtonBox.Ok)
+        button_box.accepted.connect(dialog.accept)
+        layout.addWidget(button_box)
+        
+        if dialog.exec_() == QDialog.Accepted:
             # Преобразуем введенные значения в вектор
             vector = np.zeros(size)
-            for i in range(size):
-                vector[i] = entries[i].get()
-            result[0] = vector
-            dialog.destroy()
+            try:
+                for i in range(size):
+                    vector[i] = float(entries[i].text())
+                return vector
+            except ValueError:
+                QMessageBox.warning(self, "Ошибка", "Введено некорректное значение")
+                return self.vector_input_dialog(title, message, size)
         
-        ttk.Button(dialog, text="OK", command=on_ok).pack(padx=10, pady=10)
-        
-        # Ждем, пока окно закроется
-        self.root.wait_window(dialog)
-        return result[0]
+        return None
     
     def start_generation(self):
         """Основной метод для генерации задач, аналог основной программы Pascal"""
         try:
-            inter = self.Inter.get()
-            iter_count = self.Iter.get()
+            inter = self.Inter
+            iter_count = self.Iter
             
             if inter <= 0 or iter_count <= 0:
-                messagebox.showerror("Ошибка", "Значения должны быть положительными")
+                QMessageBox.critical(self, "Ошибка", "Значения должны быть положительными")
                 return
             
             # Очищаем лог перед началом
@@ -227,8 +257,8 @@ class OptimizationGenerator:
             
             # Настраиваем прогресс-бар
             total_steps = inter * iter_count
-            self.progress["maximum"] = total_steps
-            self.progress["value"] = 0
+            self.progress.setMaximum(total_steps)
+            self.progress.setValue(0)
             
             # Основной цикл генерации (аналог вложенных циклов в Pascal)
             for l in range(1, inter + 1):
@@ -260,7 +290,7 @@ class OptimizationGenerator:
                             # Проверка на допустимость размерностей
                             if self.N[k-1] > self.NMAX or self.M[k-1] > self.MMAX:
                                 self.log_message("Too big dimensions!")
-                                messagebox.showerror("Ошибка", "Слишком большие размерности!")
+                                QMessageBox.critical(self, "Ошибка", "Слишком большие размерности!")
                                 return
                         
                         if k == 1:
@@ -408,16 +438,17 @@ class OptimizationGenerator:
                     self.log_message(f"Результаты сохранены в файл {filename}")
                     
                     # Обновляем прогресс-бар
-                    self.progress["value"] += 1
-                    self.root.update_idletasks()
+                    self.progress.setValue(self.progress.value() + 1)
+                    QApplication.processEvents()
             
-            messagebox.showinfo("Готово", "Генерация завершена успешно!")
+            QMessageBox.information(self, "Готово", "Генерация завершена успешно!")
             
         except Exception as e:
-            messagebox.showerror("Ошибка", f"Произошла ошибка: {str(e)}")
+            QMessageBox.critical(self, "Ошибка", f"Произошла ошибка: {str(e)}")
             self.log_message(f"ОШИБКА: {str(e)}")
 
 if __name__ == "__main__":
-    root = tk.Tk()
-    app = OptimizationGenerator(root)
-    root.mainloop() 
+    app = QApplication(sys.argv)
+    window = OptimizationGenerator()
+    window.show()
+    sys.exit(app.exec_()) 
